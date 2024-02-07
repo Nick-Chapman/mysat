@@ -1,10 +1,10 @@
-name:                sat
+name:                mysat
 version:             0.1.0.0
 description:         Explore Sat Solving.
 license:             BSD3
 author:              Nick Chapman
 maintainer:          nic@amadido.co.uk
-github:              Nick-Chapman/sat.git
+github:              Nick-Chapman/mysat.git
 
 extra-source-files:
 - README.md
@@ -63,4 +63,4 @@ library:
 executables:
   main.exe:
     main:                app/main.hs
-    dependencies:        sat
+    dependencies:        mysat

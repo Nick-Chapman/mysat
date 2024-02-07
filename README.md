@@ -1,4 +1,4 @@
-# sat
+# mysat
 
 Explore Sat Solving.
 

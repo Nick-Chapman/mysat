@@ -3,7 +3,7 @@ module Tests (runAll) where
 
 import Check (checkSatisyingAssigment)
 import Load (load)
-import Solve (solve,SearchTree,summarize,answerFromTree)
+import Solve (solve,SearchTree,summarize,firstAnswer)
 import Spec (Spec,sizeInfo)
 import System.Timeout (timeout)
 import Text.Printf (printf)
@@ -60,7 +60,7 @@ runTest duration spec expect = do
   timeout duration (solve spec) >>= \case
     Nothing -> pure Timeout
     Just tree -> do
-      let answer = answerFromTree tree
+      answer <- firstAnswer tree
       pure $
         case (answer,expect) of
           (A.UnSat,Sat) -> Fail

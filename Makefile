@@ -1,8 +1,14 @@
 
 top: reg
 
-q: k
+p: k #Sat
+	stack run k/cnf/prime169.cnf
+
+q: k #Sat
 	stack run cnf/queens.cnf
+
+x: k #UnSat
+	stack run cnf/running_example.cnf
 
 dev: k
 	stack run kissat/test/cnf/sqrt4489.cnf

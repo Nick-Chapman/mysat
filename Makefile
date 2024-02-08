@@ -1,3 +1,3 @@
 
-run:
-	stack run cnf/queens.cnf
+tests:
+	stack run

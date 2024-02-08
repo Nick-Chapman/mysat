@@ -7,7 +7,7 @@ import Solve (solve,SearchTree,summarize,answerFromTree)
 import Spec (Spec,sizeInfo)
 import System.Timeout (timeout)
 import Text.Printf (printf)
-import qualified Solve as A (Answer(..))
+import qualified Spec as A (Answer(..))
 
 runAll :: Bool -> IO ()
 runAll verbose = do

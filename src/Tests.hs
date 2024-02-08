@@ -4,7 +4,7 @@ module Tests (runAll) where
 import Check (checkSatisyingAssigment)
 import Load (load)
 import Solve (solve,SearchTree,summarize,answerFromTree)
-import Spec (Spec)
+import Spec (Spec,sizeInfo)
 import System.Timeout (timeout)
 import Text.Printf (printf)
 import qualified Solve as A (Answer(..))
@@ -36,23 +36,24 @@ seeTest verbose duration justify expect base = do
   let file = base++".cnf"
   spec <- load file
   res <- runTest duration spec expect
-  seeResult res
-  pure res
-  where
+  let z = sizeInfo spec
+  let jbase = justify base
+  let
     seeResult :: Res -> IO ()
     seeResult = \case
       Timeout -> do
-        printf "%s : TIMEOUT (%s)\n" jbase (show expect)
+        printf "%s : TIMEOUT (%s) (%s)\n" jbase (show expect) z
         pure ()
       Pass tree -> do
         if verbose
-          then printf "%s : PASS (%s; %s)\n" jbase (show expect) (summarize tree)
+          then printf "%s : PASS (%s; %s) (%s)\n" jbase (show expect) (summarize tree) z
           else pure ()
       Fail -> do
-        printf "%s : FAIL (%s)\n" jbase (show expect)
+        printf "%s : FAIL (%s) (%s)\n" jbase z (show expect) z
         pure ()
-      where
-        jbase = justify base
+
+  seeResult res
+  pure res
 
 runTest :: Int -> Spec -> Expect -> IO Res
 runTest duration spec expect = do

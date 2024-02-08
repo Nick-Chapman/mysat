@@ -1,26 +1,24 @@
 
 module Tests (runAll) where
 
-import qualified System.Timeout (timeout)
 import Check (checkSatisyingAssigment)
 import Load (load)
 import Solve (solve)
-import qualified Solve as A (Answer(..))
-import System.IO (hFlush, stdout)
+import Spec (Spec)
+import System.Timeout (timeout)
 import Text.Printf (printf)
+import qualified Solve as A (Answer(..))
 
 runAll :: IO ()
 runAll = do
-  let waitDuration = 100000 -- 1/10 sec
+  let duration = 100000 -- 1/10 sec
   let n = maximum [ length name | (name,_) <- examples ]
   let justify s = s ++ replicate (n - length s) ' '
-  xs <- sequence [ seeTimeout expect waitDuration (test1 justify expect name)
-                 | (name,expect) <- examples
-                 ]
+  xs <- sequence [ seeTest duration justify expect name | (name,expect) <- examples ]
   let numTests = length xs
-  let numTimeout = length [ () | Nothing <- xs ]
-  let numPass = length [ () | Just True <- xs ]
-  let numFail = length [ () | Just False <- xs ]
+  let numTimeout = length [ () | Timeout{} <- xs ]
+  let numPass = length [ () | Pass{} <- xs ]
+  let numFail = length [ () | Fail <- xs ]
   printf "%d tests ran; %s\n"
     numTests
     (if numPass == numTests then "all pass." else
@@ -29,41 +27,45 @@ runAll = do
        (if numTimeout > 0 then printf "%d timeout; " numTimeout else "")
        numPass)
 
-seeTimeout :: Expect -> Int -> IO a -> IO (Maybe a)
-seeTimeout expect n io = do
-  System.Timeout.timeout n io >>= \case
-    res@Just{} -> pure res
-    Nothing -> do
-      printf "TIMEOUT (%s)\n" (show expect)
-      pure Nothing
-
-test1 :: (String -> String) -> Expect -> FilePath -> IO Bool
-test1 justify expect base = do
-  let jbase = justify base
-  let file = base++".cnf"
-  printf "%s : " jbase; hFlush stdout
-  spec <- load file
-  answer <- solve spec
-  case (answer,expect) of
-    (A.UnSat,UnSat) -> do
-      printf "PASS (UnSat)\n"
-      pure True
-    (A.Sat ass,Sat) -> do
-      case checkSatisyingAssigment spec ass of
-        True -> do
-          printf "PASS (Sat)\n"
-          pure True
-        False -> do
-          printf "FAIL (Sat,checks wrong)\n"
-          pure False
-    (A.UnSat,Sat) -> do
-      printf "FAIL (answer:UnSat,expected:Sat)\n"
-      pure False
-    (A.Sat{},UnSat) -> do
-      printf "FAIL (answer:Sat,expected:UnSat)\n"
-      pure False
-
 data Expect = Sat | UnSat deriving Show
+
+data Res = Pass Expect | Timeout Expect | Fail
+
+seeTest :: Int -> (String -> String) -> Expect -> String -> IO Res
+seeTest duration justify expect base = do
+  let file = base++".cnf"
+  spec <- load file
+  res <- runTest duration spec expect
+  seeResult res
+  pure res
+  where
+    seeResult :: Res -> IO ()
+    seeResult = \case
+      Timeout expect -> do
+        printf "%s : TIMEOUT (%s)\n" jbase (show expect)
+        pure ()
+      Pass _expect -> do
+        --printf "%s : PASS (%s)\n" jbase (show _expect)
+        pure ()
+      Fail -> do
+        printf "%s : FAIL (%s)\n" jbase (show expect)
+        pure ()
+      where
+        jbase = justify base
+
+runTest :: Int -> Spec -> Expect -> IO Res
+runTest duration spec expect = do
+  timeout duration (solve spec) >>= \case
+    Nothing -> pure (Timeout expect)
+    Just answer -> pure $
+      case (answer,expect) of
+        (A.UnSat,Sat) -> Fail
+        (A.Sat{},UnSat) -> Fail
+        (A.UnSat,UnSat) -> Pass UnSat
+        (A.Sat ass,Sat) ->
+          case checkSatisyingAssigment spec ass of
+            True -> Pass Sat
+            False -> Fail
 
 examples :: [(FilePath,Expect)]
 examples = []

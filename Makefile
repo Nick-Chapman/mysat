@@ -2,7 +2,7 @@
 top: reg
 
 dev: k
-	stack run kissat/test/cnf/ph5.cnf
+	stack run kissat/test/cnf/sqrt4489.cnf
 
 reg: tests.log
 	git diff tests.log

@@ -22,21 +22,17 @@ answerFromTree SearchTree{answer} = answer
 solve :: Spec -> IO SearchTree
 solve Spec{clauses=clauses0} = top
   where
-    doUnitProp = True
 
     top :: IO SearchTree
     top = do
       (counts,answer) <- go counts0 (initState clauses0)
       pure SearchTree { answer, counts }
 
-    maybeUnitProp c s =
-      if doUnitProp then tryUnitProp c s else Just (s,c)
-
     go :: Counts -> State -> IO (Counts,Answer)
     go counts s0 = do
-      case maybeUnitProp counts s0 of
-        Nothing -> pure (tickC counts,UnSat)
-        Just (s,counts) -> do
+      case unitProp counts s0 of
+        (counts,Nothing) -> pure (tickC counts,UnSat)
+        (counts,Just s) -> do
           case areWeDone s of
             Just a -> pure (tickC counts, a)
             Nothing -> do
@@ -64,19 +60,20 @@ extendAssNeverInvalid x s =
     Nothing -> error "invalid extension"
     Just s -> s
 
-tryUnitProp :: Counts -> State -> Maybe (State,Counts)
-tryUnitProp counts s = do
+unitProp :: Counts -> State -> (Counts,Maybe State)
+unitProp counts s = do
   case unitClauseLits s of
-    [] -> Just (s,counts)
+    [] -> (counts, Just s)
     xs -> tryExtends counts s xs
   where
-    tryExtends :: Counts -> State -> [Literal] -> Maybe (State,Counts)
+    tryExtends :: Counts -> State -> [Literal] -> (Counts, Maybe State)
     tryExtends counts s = \case
-      [] -> tryUnitProp counts s
+      [] -> unitProp counts s
       x:xs -> do
+        let counts' = tickF counts
         case extendAss x s of
-          Nothing -> Nothing
-          Just s' -> tryExtends (tickF counts) s' xs
+          Nothing -> (counts', Nothing)
+          Just s' -> tryExtends counts' s' xs
 
 unitClauseLits :: State -> [Literal]
 unitClauseLits State{toBeSat} = [ x | Clause [x] <- toBeSat ]

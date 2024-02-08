@@ -8,10 +8,10 @@ reg: tests.log
 	git diff tests.log
 
 tests.log: k src/*.hs Makefile
-	stack run > tests.log
+	stack run regression > tests.log
 
 tests: k
-	stack run
+	stack run tests
 
 k: kissat
 	ln -s kissat/test k

@@ -1,33 +1,34 @@
 
 module Solve
-  ( solve
-  , Answer(..)
+  ( solve, SearchTree, summarize
+  , answerFromTree, Answer(..)
   ) where
 
 import Data.List (intercalate)
-import Spec (Spec(..),Clause(..),Literal(..))
---import Text.Printf (printf)
+import Spec (Spec(..),Clause(..),Literal(..),Answer(..))
+import Text.Printf (printf)
 
-data Answer = UnSat | Sat [Literal]
+-- TODO: keep track of the number of decisions we make,and how any conflicts we run into
+data SearchTree = SearchTree
+  { answer :: Answer
+  , numSteps :: Int
+  }
 
-instance Show Answer where
-  show = \case
-    UnSat -> "UNSAT"
-    Sat xs -> "v " ++ show (Clause xs)
+summarize :: SearchTree -> String
+summarize SearchTree{numSteps} = printf "#steps:%d" numSteps
 
-solve :: Spec -> IO Answer
+answerFromTree :: SearchTree -> Answer
+answerFromTree SearchTree{answer} = answer
+
+solve :: Spec -> IO SearchTree
 solve Spec{clauses=clauses0} = top
   where
-
     doUnitProp = True
 
-    -- TODO: keep track of the number of decisions we make,and how any conflicts we run into
-
-    top :: IO Answer
+    top :: IO SearchTree
     top = do
-      (_n,res) <- go 0 (initState clauses0)
-      --printf "#steps=%d\n" _n
-      pure res
+      (numSteps,answer) <- go 0 (initState clauses0)
+      pure SearchTree { answer, numSteps }
 
     maybeUnitProp = if doUnitProp then tryUnitProp else Just
 

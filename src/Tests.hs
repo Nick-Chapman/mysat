@@ -3,18 +3,18 @@ module Tests (runAll) where
 
 import Check (checkSatisyingAssigment)
 import Load (load)
-import Solve (solve)
+import Solve (solve,SearchTree,summarize,answerFromTree)
 import Spec (Spec)
 import System.Timeout (timeout)
 import Text.Printf (printf)
 import qualified Solve as A (Answer(..))
 
-runAll :: IO ()
-runAll = do
+runAll :: Bool -> IO ()
+runAll verbose = do
   let duration = 100000 -- 1/10 sec
   let n = maximum [ length name | (name,_) <- examples ]
   let justify s = s ++ replicate (n - length s) ' '
-  xs <- sequence [ seeTest duration justify expect name | (name,expect) <- examples ]
+  xs <- sequence [ seeTest verbose duration justify expect name | (name,expect) <- examples ]
   let numTests = length xs
   let numTimeout = length [ () | Timeout{} <- xs ]
   let numPass = length [ () | Pass{} <- xs ]
@@ -29,10 +29,10 @@ runAll = do
 
 data Expect = Sat | UnSat deriving Show
 
-data Res = Pass Expect | Timeout Expect | Fail
+data Res = Pass SearchTree | Timeout | Fail
 
-seeTest :: Int -> (String -> String) -> Expect -> String -> IO Res
-seeTest duration justify expect base = do
+seeTest :: Bool -> Int -> (String -> String) -> Expect -> String -> IO Res
+seeTest verbose duration justify expect base = do
   let file = base++".cnf"
   spec <- load file
   res <- runTest duration spec expect
@@ -41,12 +41,13 @@ seeTest duration justify expect base = do
   where
     seeResult :: Res -> IO ()
     seeResult = \case
-      Timeout expect -> do
+      Timeout -> do
         printf "%s : TIMEOUT (%s)\n" jbase (show expect)
         pure ()
-      Pass _expect -> do
-        --printf "%s : PASS (%s)\n" jbase (show _expect)
-        pure ()
+      Pass tree -> do
+        if verbose
+          then printf "%s : PASS (%s; %s)\n" jbase (show expect) (summarize tree)
+          else pure ()
       Fail -> do
         printf "%s : FAIL (%s)\n" jbase (show expect)
         pure ()
@@ -56,16 +57,18 @@ seeTest duration justify expect base = do
 runTest :: Int -> Spec -> Expect -> IO Res
 runTest duration spec expect = do
   timeout duration (solve spec) >>= \case
-    Nothing -> pure (Timeout expect)
-    Just answer -> pure $
-      case (answer,expect) of
-        (A.UnSat,Sat) -> Fail
-        (A.Sat{},UnSat) -> Fail
-        (A.UnSat,UnSat) -> Pass UnSat
-        (A.Sat ass,Sat) ->
-          case checkSatisyingAssigment spec ass of
-            True -> Pass Sat
-            False -> Fail
+    Nothing -> pure Timeout
+    Just tree -> do
+      let answer = answerFromTree tree
+      pure $
+        case (answer,expect) of
+          (A.UnSat,Sat) -> Fail
+          (A.Sat{},UnSat) -> Fail
+          (A.UnSat,UnSat) -> Pass tree
+          (A.Sat ass,Sat) ->
+            case checkSatisyingAssigment spec ass of
+              True -> Pass tree
+              False -> Fail
 
 examples :: [(FilePath,Expect)]
 examples = []

@@ -9,7 +9,7 @@ import Tests (runAll)
 main :: IO ()
 main = do
   getArgs >>= \case
-    ["regression"] -> runAll False
+    ["reg"] -> runAll False
     ["tests"] -> runAll True
     [x] -> run1 x
     args -> error (show ("args",args))

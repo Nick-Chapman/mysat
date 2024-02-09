@@ -17,7 +17,7 @@ sizeInfo :: Spec -> String
 sizeInfo Spec{nVars,nClauses} = printf "%d/%d" nVars nClauses
 
 data Clause = Clause [Literal]
-data Literal = Pos Var | Neg Var deriving Eq
+data Literal = Pos Var | Neg Var deriving (Eq,Ord)
 type Var = Int
 
 instance Show Clause where

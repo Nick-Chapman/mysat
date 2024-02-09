@@ -2,14 +2,18 @@
 module Solve2 (solve,SearchTree,printST,summarize,firstAnswer) where
 
 import Spec (Spec(..),Clause(..),Literal(..),Answer)
-import qualified Spec as A
 import Text.Printf (printf)
+import qualified Data.Set as Set
+import qualified Spec as A
+
+nub :: Ord a => [a] -> [a]
+nub = Set.toList . Set.fromList
 
 data SearchTree
   = ST_Sat Level [Literal] (IO SearchTree)
-  | ST_Conflict Level SearchTree
-  | ST_Left Level Literal SearchTree
-  | ST_Right Level Literal SearchTree
+  | ST_Conflict Level State SearchTree
+  | ST_Left Level Literal State SearchTree
+  | ST_Right Level Literal State SearchTree
   | ST_Done
 
 type Level = Int
@@ -19,9 +23,9 @@ summarize = show . trav 0 0
   where
     trav :: Int -> Int -> SearchTree -> Counts
     trav d c = \case
-      ST_Left _ _ tree -> trav (d+1) c tree
-      ST_Conflict _ tree -> trav d (c+1) tree
-      ST_Right _ _ tree -> trav d c tree
+      ST_Left _ _ _ tree -> trav (d+1) c tree
+      ST_Conflict _ _ tree -> trav d (c+1) tree
+      ST_Right _ _ _ tree -> trav d c tree
       ST_Sat{} -> stop
       ST_Done -> stop
       where
@@ -39,9 +43,9 @@ firstAnswer = pure . look
     look = \case
       ST_Done{} -> A.UnSat
       ST_Sat _ ass _more -> A.Sat ass
-      ST_Conflict _ k -> look k
-      ST_Left _ _ tree -> look tree
-      ST_Right _ _ tree -> look tree
+      ST_Conflict _ _ k -> look k
+      ST_Left _ _ _ tree -> look tree
+      ST_Right _ _ _ tree -> look tree
 
 printST :: Bool -> SearchTree -> IO ()
 printST full  = trav
@@ -53,14 +57,14 @@ printST full  = trav
       ST_Sat n xs k -> do
         printf "%sSat[%s]\n" (tab n) (show (Clause xs))
         if full then do tree <- k; trav tree else pure ()
-      ST_Conflict _n tree -> do
-        --printf "%sConflict\n" (tab _n)
+      ST_Conflict _n s tree -> do
+        printf "%sConflict(%s)\n" (tab _n) (sizeState s)
         trav tree
-      ST_Left n x left -> do
-        printf "%sL[%s]\n" (tab n) (show x)
-        trav left
-      ST_Right n x tree -> do
-        printf "%sR[%s]\n" (tab n) (show x)
+      ST_Left n x s tree -> do
+        printf "%sL[%s](%s)\n" (tab n) (show x) (sizeState s)
+        trav tree
+      ST_Right n x s tree -> do
+        printf "%sR[%s](%s)\n" (tab n) (show x) (sizeState s)
         trav tree
       ST_Done{} -> do
         pure ()
@@ -73,17 +77,19 @@ solve spec = go 0 (initState spec) (pure ST_Done)
       case unitProp s of
         Nothing -> do
           tree <- k
-          pure (ST_Conflict n tree)
+          pure (ST_Conflict n s tree)
         Just s -> do
           m <- areWeDone n k s
           case m of
             Just t -> pure t
             Nothing -> do
               let x = pickLit s
-              let right = go (n+1) (extendAssNeverInvalid (inverse x) s) k
-              let k_right = ST_Right n (inverse x) <$> right
-              left <- go (n+1) (extendAssNeverInvalid x s) k_right
-              pure (ST_Left n x left)
+              let sR = extendAssNeverInvalid (inverse x) s
+              let right = go (n+1) sR k
+              let k_right = ST_Right n (inverse x) sR <$> right
+              let sL = extendAssNeverInvalid x s
+              left <- go (n+1) sL k_right
+              pure (ST_Left n x sL left)
 
 areWeDone :: Level -> IO SearchTree -> State -> IO (Maybe SearchTree) -- TODO: inline
 areWeDone n k s =
@@ -93,7 +99,7 @@ areWeDone n k s =
       if areWeConflicted s
       then do
         tree <- k
-        pure (Just (ST_Conflict n tree))
+        pure (Just (ST_Conflict n s tree))
       else
         pure Nothing
 
@@ -106,10 +112,15 @@ extendAssNeverInvalid x s =
 inverse :: Literal -> Literal
 inverse = \case Pos x -> Neg x; Neg x -> Pos x
 
-data State = State { toBeSat :: [Clause], ass :: [Literal] }
+data State = State { spec :: Spec, toBeSat :: [Clause], ass :: [Literal] }
+
+sizeState :: State -> String
+sizeState State{spec=Spec{nVars},toBeSat,ass} = printf "%d/%d" nv (length toBeSat)
+  where
+    nv = nVars - length ass
 
 initState :: Spec -> State
-initState Spec{clauses} = State {toBeSat = clauses, ass = []}
+initState spec@Spec{clauses} = State {spec, toBeSat = clauses, ass = []}
 
 unitProp :: State -> Maybe State
 unitProp s = do
@@ -126,7 +137,7 @@ tryExtends s = \case
       Just s' -> tryExtends s' xs
 
 unitClauseLits :: State -> [Literal]
-unitClauseLits State{toBeSat} = [ x | Clause [x] <- toBeSat ]
+unitClauseLits State{toBeSat} = nub [ x | Clause [x] <- toBeSat ]
 
 areWeSatisfied :: State -> Maybe [Literal]
 areWeSatisfied State{toBeSat,ass} =
@@ -139,9 +150,9 @@ areWeConflicted State{toBeSat} =
     any (\case Clause [] -> True; _ -> False) toBeSat
 
 extendAss :: Literal -> State -> Maybe State
-extendAss x State{toBeSat=clauses0,ass=ass0} =
+extendAss x state@State{toBeSat=clauses0,ass=ass0} =
   if inverse x `elem` ass0 then Nothing else
-    Just $ State { toBeSat = map cantBeSat (filter (not . nowSat) clauses0)
+    Just $ state { toBeSat = map cantBeSat (filter (not . nowSat) clauses0)
                  , ass = x : ass0
                  }
       where

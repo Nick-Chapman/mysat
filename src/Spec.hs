@@ -1,6 +1,6 @@
 
 module Spec
-  ( Spec(..) , Literal(..) , Clause(..)
+  ( Spec(..) , Literal(..) , Clause(..), Var
   , Answer(..)
   , sizeInfo
   ) where

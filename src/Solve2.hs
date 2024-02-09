@@ -1,8 +1,12 @@
 
 module Solve2 (solve,SearchTree,printST,summarize,firstAnswer) where
 
-import Spec (Spec(..),Clause(..),Literal(..),Answer)
+import Data.List (maximumBy)
+import Data.Map (Map)
+import Data.Ord (comparing)
+import Spec (Spec(..),Clause(..),Literal(..),Answer,Var)
 import Text.Printf (printf)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Spec as A
 
@@ -160,4 +164,30 @@ extendAss x state@State{toBeSat=clauses0,ass=ass0} =
         cantBeSat (Clause xs) = Clause (filter (/= inverse x) xs)
 
 pickLit :: State -> Literal
-pickLit State{toBeSat} = head [ lit | Clause lits <- toBeSat, lit <- lits ]
+pickLit = _pickB
+  where
+    _pickA State{toBeSat=clauses} = do -- dumb
+      head [ lit | Clause lits <- clauses, lit <- lits ]
+
+    _pickB s = do -- smart
+      pickV (makeVocs s)
+
+-- Var Occurance Counts by Sense(pos/neg)
+data Vocs = Vocs (Map Var PN) deriving Show
+type PN = (Int,Int)
+
+sumPN :: PN -> PN -> PN
+sumPN (p1,n1) (p2,n2) = (p1+p2,n1+n2)
+
+makeVocs :: State -> Vocs
+makeVocs State{toBeSat=clauses} = do
+  Vocs $ Map.fromListWith sumPN $
+    [ case lit of Pos x -> (x,(1,0)); Neg x -> (x,(0,1))
+    | Clause lits <- clauses, lit <- lits
+    ]
+
+pickV :: Vocs -> Literal
+pickV (Vocs m) = do
+  let secondSum (_,(p,n)) = p+n
+  let (v,(p,n)) = maximumBy (comparing secondSum) (Map.toList m)
+  if p>n then Pos v else Neg v -- prefer neg literal when tied

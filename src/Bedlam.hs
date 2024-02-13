@@ -1,32 +1,41 @@
 
 module Bedlam (gen,pp) where
 
-import qualified Spec
-import Load (decodeAss)
-
-import Data.List (intercalate)
 import Data.List ((\\))
-import qualified Data.Map as Map
+import Data.List (intercalate)
 import Data.Map (Map)
+import Load (decodeAss)
 import Text.Printf (printf)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Spec
 
 gen :: FilePath -> IO ()
 gen fp = do
-  mapM_ print [ (p, length xs) | (p,xs) <- Map.toList orientatedPiecePos ]
-  printf "writing file: %s\n" fp
-  writeFile fp (Spec.ppSpec (lowerSpec bedlam))
+  info
+  let spec = lowerSpec bedlam
+  printf "writing file: %s (%s)\n" fp (Spec.sizeInfo spec)
+  writeFile fp (Spec.ppSpec spec)
+  printf "writing file: %s (%s) - DONE\n" fp (Spec.sizeInfo spec)
+
+info :: IO ()
+info = do
+  sequence_
+    [ printf "%s : %d\n" (show piece) (length xs)
+    | (piece,xs) <- Map.toList orientatedPiecePos
+    ]
 
 pp :: String -> IO ()
 pp str = do
   let lits = map raiseLit (decodeAss str)
+  --mapM_ print [ x | Pos (x@Var_PieceInOrientation{}) <- lits ]
   putStr (ppSolution (recreateSolution [ x | Pos x <- lits ]))
-  mapM_ print [ x | Pos (x@Var_PieceInOrientation{}) <- lits ]
 
 data Solution = Solution (Map Coord Piece)
 
 recreateSolution :: [Var] -> Solution
 recreateSolution xs = do
-  let m = Map.fromList [ (c,p) | Var_PieceInCoord p c <- xs ]
+  let m = Map.fromList [ (c,p) | PieceAt p c <- xs ]
   Solution m
 
 ppSolution :: Solution -> String
@@ -40,22 +49,62 @@ ppSolution (Solution m) = do
     ]
 
 ----------------------------------------------------------------------
--- high level
-data Literal = Pos Var | Neg Var
-data Clause = Clause [Literal]
-data Spec = Spec [Clause]
+-- bedlam constraints
 
-instance Show Literal where
-  show = \case
-    Pos x -> show x
-    Neg x -> "-" ++ show x
+locatedOrientatedPieces :: [Clause]
+locatedOrientatedPieces =
+  [ Clause [ Neg (PieceOrientation p o)
+           , Pos (PieceAt p c)
+           ]
+  | (p,xs) <- Map.toList orientatedPiecePos
+  , (o,cs) <- xs
+  , c <- cs
+  ]
 
-instance Show Clause where
-  show (Clause xs) = unwords (map show xs)
+unlocatedOrientatedPieces :: [Clause]
+unlocatedOrientatedPieces =
+  [ Clause ( Neg (PieceAt p c)
+             : [Pos (PieceOrientation p o) | o <- os ]
+           )
+  | (p,xs) <- Map.toList orientatedPiecePosT
+  , (c,os) <- xs
+  ]
 
-instance Show Spec where
-  show (Spec xs) =
-    unlines (map show xs)
+notInSameSpot :: [Clause]
+notInSameSpot =
+  [ Clause [ Neg (PieceAt p1 c)
+           , Neg (PieceAt p2 c)
+           ]
+  | p1 <- allPiece
+  , p2 <- allPiece
+  , p1 /= p2
+  , c <- allCoord
+  ]
+
+pieceInSomeOrientation :: [Clause]
+pieceInSomeOrientation =
+  [ Clause [Pos (PieceOrientation p o) | (o,_) <- xs ]
+  | (p,xs) <- Map.toList orientatedPiecePos
+  ]
+
+pieceMaxOneOrientation :: [Clause]
+pieceMaxOneOrientation =
+  [ Clause [ Neg (PieceOrientation p o1)
+           , Neg (PieceOrientation p o2) ]
+  | (p,xs) <- Map.toList orientatedPiecePos
+  , (o1,_) <- xs
+  , (o2,_) <- xs
+  , o1 /= o2
+  ]
+
+bedlam :: Spec
+bedlam = Spec $
+  []
+  ++ locatedOrientatedPieces
+  ++ unlocatedOrientatedPieces
+  ++ notInSameSpot
+  ++ pieceInSomeOrientation
+  ++ pieceMaxOneOrientation
 
 ----------------------------------------------------------------------
 -- lower
@@ -95,7 +144,31 @@ raiseVar n = maybe err id (Map.lookup n m)
         err = error (show ("raiseV",n))
 
 ----------------------------------------------------------------------
--- pos
+-- high level CNF spec
+
+data Spec = Spec [Clause]
+data Clause = Clause [Literal]
+data Literal = Pos Var | Neg Var
+
+data Var
+  = PieceAt Piece Coord
+  | PieceOrientation Piece Orientation
+  deriving (Eq,Ord,Show)
+
+allVars :: [Var]
+allVars =
+  []
+  ++ [ PieceAt p c
+     | p <- allPiece
+     , c <- allCoord
+     ]
+  ++ [ PieceOrientation p o
+     | (p,xs) <- Map.toList orientatedPiecePos
+     , (o,_) <- xs
+     ]
+
+----------------------------------------------------------------------
+-- position (on single axis of the cube)
 
 data Pos = A | B | C | D deriving (Eq,Ord,Show)
 
@@ -120,13 +193,12 @@ shifters = \case
   D -> [id]
 
 ----------------------------------------------------------------------
--- coord
+-- 3d coordinate (of the cube)
 
 type Coord = (Pos,Pos,Pos)
 
 allCoord :: [Coord]
 allCoord = [ (x,y,z) | x <- allPos, y <- allPos, z <- allPos ]
-
 
 orientators :: [Coord -> Coord]
 orientators =
@@ -143,26 +215,20 @@ orientators =
     clock     (x,y,z) = (y,z,x)
     anti      (x,y,z) = (z,x,y)
 
-{-shifts :: [Coord] -> [[Coord]]
-shifts cs =
-  take 1
-  [ map (fx.fy.fz) cs
-  | fx <- [ (\(x,y,z) -> (f x, y, z)) | f <- shifters (maximum [ x | (x,_,_) <- cs ])]
-  , fy <- [ (\(x,y,z) -> (x, f y, z)) | f <- shifters (maximum [ y | (_,y,_) <- cs ])]
-  , fz <- [ (\(x,y,z) -> (x, y, f z)) | f <- shifters (maximum [ z | (_,_,z) <- cs ])]
-  ]-}
-
-orientations :: [Coord] -> [[Coord]]
-orientations cs =
-  --take 1
+orientations0 :: [Coord] -> [[Coord]]
+orientations0 cs =
   [ map (fo.fx.fy.fz) cs
-  | fx <- --take 1 -- HACK
-          [ (\(x,y,z) -> (f x, y, z)) | f <- shifters (maximum [ x | (x,_,_) <- cs ])]
+  | fx <- [ (\(x,y,z) -> (f x, y, z)) | f <- shifters (maximum [ x | (x,_,_) <- cs ])]
   , fy <- [ (\(x,y,z) -> (x, f y, z)) | f <- shifters (maximum [ y | (_,y,_) <- cs ])]
   , fz <- [ (\(x,y,z) -> (x, y, f z)) | f <- shifters (maximum [ z | (_,_,z) <- cs ])]
   , fo <- orientators
   ]
 
+orientations :: [Coord] -> [[Coord]]
+orientations =
+  map Set.toList . nub . map Set.fromList . orientations0
+  where
+    nub = Set.toList . Set.fromList
 
 ----------------------------------------------------------------------
 -- pieces
@@ -173,19 +239,14 @@ charOfPiece (Piece c) = c
 
 piecePositions :: Map Piece [Coord]
 piecePositions =
-  Map.fromList
-  [ (Piece c,coords)
-  | (c,xs) <- raw
-  , let coords = map ppp xs
-  ]
-
+  Map.fromList [ (Piece c, map ppp xs) | (c,xs) <- raw ]
   where
     ppp (x,y,z) = (p x, p y, p z)
     p :: Int -> Pos
     p = \case 0 -> A; 1 -> B; 2 -> C; 3 -> D; _ -> error "p"
 
     raw =
-      -- red pieces (should be uppercase)
+      -- red
       [ ('A',[(0,0,0),(1,0,0),(2,0,0),(0,1,0),(0,0,1)]) -- base-girder
       , ('B',[(0,0,0),(1,0,0),(1,1,0),(2,1,0),(2,1,1)]) -- spiral-staircase
       , ('C',[(0,0,0),(1,0,0),(1,1,0),(2,1,0),(1,1,1)]) -- fork
@@ -208,6 +269,7 @@ allPiece = [ p | (p,_) <- Map.toList piecePositions ]
 
 ----------------------------------------------------------------------
 -- orientations
+
 data Orientation = Orientation Int deriving (Eq,Ord,Show)
 
 orientatedPiecePos :: Map Piece [ (Orientation,[Coord]) ]
@@ -232,78 +294,3 @@ orientatedPiecePosT = do
     [ (p, transposeOrientation xs)
     | (p,xs) <- Map.toList orientatedPiecePos
     ]
-
-
-----------------------------------------------------------------------
--- bedlam vars
-
-data Var
-  = Var_PieceInCoord Piece Coord
-  | Var_PieceInOrientation Piece Orientation
-  deriving (Eq,Ord,Show)
-
-allVars :: [Var]
-allVars =
-  []
-  ++ [ Var_PieceInCoord p c
-     | p <- allPiece, c <- allCoord
-     ]
-  ++ [ Var_PieceInOrientation p o
-     | (p,xs) <- Map.toList orientatedPiecePos
-     , (o,_) <- xs
-     ]
-
-locatedOrientatedPieces :: [Clause]
-locatedOrientatedPieces =
-  [ Clause [ Neg (Var_PieceInOrientation p o)
-           , Pos (Var_PieceInCoord p c)
-           ]
-  | (p,xs) <- Map.toList orientatedPiecePos
-  , (o,cs) <- xs
-  , c <- cs
-  ]
-
-_unlocatedOrientatedPieces :: [Clause]
-_unlocatedOrientatedPieces =
-  [ Clause ( Neg (Var_PieceInCoord p c)
-             : [Pos (Var_PieceInOrientation p o) | o <- os ]
-           )
-  | (p,xs) <- Map.toList orientatedPiecePosT
-  , (c,os) <- xs
-  ]
-
-notInSameSpot :: [Clause]
-notInSameSpot =
-  [ Clause [ Neg (Var_PieceInCoord p1 c)
-           , Neg (Var_PieceInCoord p2 c)
-           ]
-  | p1 <- allPiece
-  , p2 <- allPiece
-  , p1 /= p2
-  , c <- allCoord
-  ]
-
-pieceInSomeOrientation :: [Clause]
-pieceInSomeOrientation =
-  [ Clause [Pos (Var_PieceInOrientation p o) | (o,_) <- xs ]
-  | (p,xs) <- Map.toList orientatedPiecePos
-  ]
-
-pieceMaxOneOrientation :: [Clause]
-pieceMaxOneOrientation =
-  [ Clause [ Neg (Var_PieceInOrientation p o1)
-           , Neg (Var_PieceInOrientation p o2) ]
-  | (p,xs) <- Map.toList orientatedPiecePos
-  , (o1,_) <- xs
-  , (o2,_) <- xs
-  , o1 /= o2
-  ]
-
-bedlam :: Spec
-bedlam = Spec $
-  []
-  ++ locatedOrientatedPieces
-  ++ _unlocatedOrientatedPieces -- for partial puzzles
-  ++ notInSameSpot
-  ++ pieceInSomeOrientation
-  ++ pieceMaxOneOrientation

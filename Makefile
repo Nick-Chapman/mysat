@@ -1,38 +1,34 @@
 
-top: bedlam
+top: kissat k bedlam
 
 reg: tests.log
 	git diff tests.log
 
 exe = .stack-work/dist/x86_64-linux/ghc-9.2.7/build/main.exe/main.exe
 
-bedlam: ek bedlam.cnf
+bedlam: $(exe) bedlam.cnf
 	kissat bedlam.cnf | grep ^v | $(exe) bedlam pp
 
-bedlam.cnf: ek
+bedlam.cnf: $(exe) k
 	$(exe) bedlam gen $@
 
-tests.log: ek src/*.hs
+tests.log: $(exe) src/*.hs
 	$(exe) reg > tests.log
 
-p: ek #Sat
+p: $(exe) #Sat
 	$(exe) k/cnf/prime169.cnf
 
-h: ek #UnSat
+h: $(exe) #UnSat
 	$(exe) k/cnf/ph6.cnf
 
-q: ek #Sat
+q: $(exe) #Sat
 	$(exe) cnf/queens.cnf
 
-x: ek #UnSat
+x: $(exe) #UnSat
 	$(exe) cnf/running_example.cnf
 
-tests: ek
+tests: $(exe)
 	$(exe) tests
-
-ek: e k
-
-e: $(exe)
 
 $(exe): src/*.hs
 	stack build; touch $(exe)

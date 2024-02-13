@@ -6,3 +6,4 @@ stack.yaml.lock
 k
 kissat
 tests.log
+bedlam.cnf

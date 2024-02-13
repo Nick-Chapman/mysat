@@ -1,31 +1,44 @@
 
-top: reg
-
-
-p: k #Sat
-	stack run k/cnf/prime169.cnf
-
-h: k #UnSat
-	stack run k/cnf/ph6.cnf
-
-q: k #Sat
-	stack run cnf/queens.cnf
-
-x: k #UnSat
-	stack run cnf/running_example.cnf
-
+top: bedlam
 
 reg: tests.log
 	git diff tests.log
 
-tests.log: k src/*.hs Makefile
-	stack run reg > tests.log
+exe = .stack-work/dist/x86_64-linux/ghc-9.2.7/build/main.exe/main.exe
 
-tests: k
-	stack run tests
+bedlam: ek bedlam.cnf
+	kissat bedlam.cnf | grep ^v | $(exe) bedlam pp
+
+bedlam.cnf: ek
+	$(exe) bedlam gen > bedlam.cnf
+
+tests.log: ek src/*.hs
+	$(exe) reg > tests.log
+
+p: ek #Sat
+	$(exe) k/cnf/prime169.cnf
+
+h: ek #UnSat
+	$(exe) k/cnf/ph6.cnf
+
+q: ek #Sat
+	$(exe) cnf/queens.cnf
+
+x: ek #UnSat
+	$(exe) cnf/running_example.cnf
+
+tests: ek
+	$(exe) tests
+
+ek: e k
+
+e: $(exe)
+
+$(exe): src/*.hs
+	stack build; touch $(exe)
 
 k: kissat
-	ln -s kissat/test k
+	rm -rf k; ln -s kissat/test k
 
 kissat:
 	git clone git@github.com:arminbiere/kissat.git

@@ -2,15 +2,18 @@
 module Top (main) where
 
 import Load (load)
-import Spec (sizeInfo)
+import Spec (sizeInfo,ppSpec)
 import Solve (solve,summarize,firstAnswer,printST)
 import System.Environment (getArgs)
 import Tests (runAll)
 import Text.Printf (printf)
+import qualified Bedlam
 
 main :: IO ()
 main = do
   getArgs >>= \case
+    ["bedlam","gen"] -> genBedlam
+    ["bedlam","pp"] -> ppBedlam
     ["reg"] -> runAll False
     ["tests"] -> runAll True
     [x] -> run1 x
@@ -28,3 +31,12 @@ run1 file = do
   --answer <- firstAnswer tree
   --print answer
   pure ()
+
+
+genBedlam :: IO ()
+genBedlam = putStr (ppSpec Bedlam.encodeCnf)
+
+ppBedlam :: IO ()
+ppBedlam = do
+  i <- getContents
+  putStr (Bedlam.ppSolution (Bedlam.decodeSolution i))

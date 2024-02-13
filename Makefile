@@ -10,7 +10,7 @@ bedlam: ek bedlam.cnf
 	kissat bedlam.cnf | grep ^v | $(exe) bedlam pp
 
 bedlam.cnf: ek
-	$(exe) bedlam gen > bedlam.cnf
+	$(exe) bedlam gen $@
 
 tests.log: ek src/*.hs
 	$(exe) reg > tests.log

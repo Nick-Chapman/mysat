@@ -2,18 +2,18 @@
 module Top (main) where
 
 import Load (load)
-import Spec (sizeInfo,ppSpec)
+import Spec (sizeInfo)
 import Solve (solve,summarize,firstAnswer,printST)
 import System.Environment (getArgs)
 import Tests (runAll)
 import Text.Printf (printf)
-import qualified Bedlam
+import qualified Bedlam (gen,pp)
 
 main :: IO ()
 main = do
   getArgs >>= \case
-    ["bedlam","gen"] -> genBedlam
-    ["bedlam","pp"] -> ppBedlam
+    ["bedlam","gen",file] -> Bedlam.gen file
+    ["bedlam","pp"] -> getContents >>= Bedlam.pp
     ["reg"] -> runAll False
     ["tests"] -> runAll True
     [x] -> run1 x
@@ -28,15 +28,4 @@ run1 file = do
   let _full = False
   printST _full tree
   print (summarize tree)
-  --answer <- firstAnswer tree
-  --print answer
   pure ()
-
-
-genBedlam :: IO ()
-genBedlam = putStr (ppSpec Bedlam.encodeCnf)
-
-ppBedlam :: IO ()
-ppBedlam = do
-  i <- getContents
-  putStr (Bedlam.ppSolution (Bedlam.decodeSolution i))

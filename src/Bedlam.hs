@@ -40,7 +40,7 @@ recreateSolution xs = do
 
 ppSolution :: Solution -> String
 ppSolution (Solution m) = do
-  let look c = maybe '.' charOfPiece (Map.lookup c m)
+  let look c = maybe '?' charOfPiece (Map.lookup c m)
   intercalate "\n"
     [ unlines [ [ look (x,y,z) | x <- allPos ]
               | y <- allPos
@@ -81,6 +81,14 @@ notInSameSpot =
   , c <- allCoord
   ]
 
+somethingEverywhere :: [Clause]
+somethingEverywhere =
+  [ Clause [ Pos (PieceAt p c)
+           | p <- allPiece
+           ]
+  | c <- allCoord
+  ]
+
 pieceInSomeOrientation :: [Clause]
 pieceInSomeOrientation =
   [ Clause [Pos (PieceOrientation p o) | (o,_) <- xs ]
@@ -103,6 +111,7 @@ bedlam = Spec $
   ++ locatedOrientatedPieces
   ++ unlocatedOrientatedPieces
   ++ notInSameSpot
+  ++ somethingEverywhere
   ++ pieceInSomeOrientation
   ++ pieceMaxOneOrientation
 
@@ -261,11 +270,13 @@ piecePositions =
       , ('w',[(0,0,0),(1,0,0),(2,0,0),(2,1,0),(0,0,1)]) -- hug
       , ('x',[(0,0,0),(1,0,0),(2,0,0),(1,1,0),(1,0,1)]) -- middle-girder
       , ('y',[(0,0,0),(1,0,0),(1,1,0),(2,1,0),(2,2,0)]) -- simple-stairs
---      , ('z',[(0,0,0),(1,0,0),(1,1,0),(1,1,1)]) -- small-one
+      , ('z',[(0,0,0),(1,0,0),(1,1,0),(1,1,1)]) -- small-one
       ]
 
 allPiece :: [Piece]
-allPiece = [ p | (p,_) <- Map.toList piecePositions ]
+allPiece =
+--  [ Piece '.' ] ++
+  [ p | (p,_) <- Map.toList piecePositions ]
 
 ----------------------------------------------------------------------
 -- orientations

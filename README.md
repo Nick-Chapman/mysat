@@ -1,6 +1,9 @@
 # mysat
 
-Explore Sat Solving.
+## Dependency (for solving Bedlam)
+- [kissat](https://github.com/arminbiere/kissat)
+
+## Explore Sat Solving.
 
 Goal: implement _conflict driven clause learning_ (CDCL)
 
@@ -8,7 +11,6 @@ Goal: implement _conflict driven clause learning_ (CDCL)
 - [Silent Revolution](https://cacm.acm.org/magazines/2023/6/273222-the-silent-revolution-of-sat/fulltext)
 - [N QueensPuzzle encoder](https://github.com/bglezseoane/sat-nqueens/tree/master?tab=readme-ov-file)
 - [Kissat](https://github.com/arminbiere/kissat)
-
 
 ### Status
 - `132 tests ran; 20 timeout; 112 pass.` (timeout = 1/10s)
@@ -27,3 +29,16 @@ k/cnf/prime169        : PASS (Sat; Counts {decisions = 31, forced = 2897, confli
 k/cnf/prime289        : PASS (Sat; Counts {decisions = 31, forced = 3462, conflicts = 28}) (615/1798)
 k/cnf/prime361        : PASS (Sat; Counts {decisions = 35, forced = 3670, conflicts = 32}) (615/1798)
 ```
+
+## Use sat solver to solve Bedlam cube
+```
+make bedlam
+```
+
+## Attempt to use sat solver to solve [Dilemma cube](https://www.dilemma-games.com/index2.php?id=10&catId=6&productId=898&lang=ENG)
+```
+make wooden
+```
+
+Unlikely to complete. It is not smart:
+No constraints prevent the 25 identical pieces from being tried in all permutations!

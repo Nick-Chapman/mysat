@@ -8,10 +8,13 @@ import System.Environment (getArgs)
 import Tests (runAll)
 import Text.Printf (printf)
 import qualified Bedlam (gen,pp)
+import qualified Wooden (gen,pp)
 
 main :: IO ()
 main = do
   getArgs >>= \case
+    ["wooden","gen",file] -> Wooden.gen file
+    ["wooden","pp"] -> getContents >>= Wooden.pp
     ["bedlam","gen",file] -> Bedlam.gen file
     ["bedlam","pp"] -> getContents >>= Bedlam.pp
     ["reg"] -> runAll False
